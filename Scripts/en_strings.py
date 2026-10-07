@@ -1,6 +1,7 @@
 # Bản dịch tiếng Anh: khoá = chuỗi gốc tiếng Việt. Sinh Resources/en.lproj/Localizable.strings:
 #   python3 Scripts/en_strings.py
 EN = {
+'Đang phát từ': 'PLAYING FROM',
 'YouTube Music phát và tải trực tiếp, không cần cài gì thêm. yt-dlp (mã nguồn mở, tuỳ chọn) chỉ là dự phòng khi YouTube đổi cách chặn, và dùng để tải link từ trang web khác. ffmpeg (brew install ffmpeg) giúp tệp tải về chuẩn hơn.': 'YouTube Music plays and downloads directly, nothing extra to install. yt-dlp (open source, optional) is only a fallback for when YouTube changes its blocking, and for downloading links from other websites. ffmpeg (brew install ffmpeg) gives cleaner downloaded files.',
 'YouTube: không lấy được mã khách.': 'YouTube: couldn’t get a visitor ID.',
 'YouTube từ chối phát video này.': 'YouTube refused to play this video.',
@@ -277,7 +278,6 @@ EN = {
 'Đang kết nối…': 'Connecting…',
 'Đang lấy thông tin…': 'Getting info…',
 'Đang phát': 'Now playing',
-'Đang phát từ %@': 'Playing from %@',
 'Đang theo dõi': 'Following',
 'Đang tải xuống %@ bài hát': 'Downloading %@ songs',
 'Đang tải xuống “%@”': 'Downloading “%@”',

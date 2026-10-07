@@ -184,74 +184,198 @@ struct LyricsView: View {
     }
 }
 
-// MARK: - Toàn màn hình
+// MARK: - Toàn màn hình (bố cục giống Spotify)
 
 struct FullScreenPlayer: View {
     @ObservedObject private var player = MusicPlayer.shared
     @ObservedObject private var remote = RemoteArt.shared
     @ObservedObject private var lyrics = LyricsStore.shared
     @State private var enteredFullScreen = false
+    @State private var showLyrics = false
+    @State private var idle = false
+    @State private var lastMove = Date()
+    @State private var scrub: Double?
+    @State private var lastVolume: Float = 0.8
 
     var body: some View {
         let t = player.current
-        ZStack {
-            Color.black
-            ArtworkView(track: t, size: 1400, radius: 0)
-                .blur(radius: 60)
-                .opacity(0.55)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-            LinearGradient(colors: [.black.opacity(0.4), .clear, .black.opacity(0.85)], startPoint: .top, endPoint: .bottom)
+        GeometryReader { geo in
+            let art = min(geo.size.height * 0.36, geo.size.width * 0.28, 360)
+            ZStack(alignment: .topLeading) {
+                backdrop(t, size: geo.size)
 
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    HStack(spacing: 8) {
-                        Image(systemName: "waveform").foregroundStyle(Brand.accent)
-                        Text(player.contextTitle.map { L("Đang phát từ \($0)") } ?? "Muzify")
-                    }
-                    .font(.system(size: 14, weight: .bold))
-                    Spacer()
-                    IconButton(symbol: "arrow.down.right.and.arrow.up.left", size: 16, help: L("Thoát toàn màn hình (Esc)"), action: close)
-                        .keyboardShortcut(.cancelAction)
-                }
-                Spacer()
-                HStack(alignment: .bottom, spacing: 28) {
-                    ArtworkView(track: t, size: 260, radius: 8)
-                        .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
-                    VStack(alignment: .leading, spacing: 10) {
-                        if let line = currentLyric {
-                            Text(line).font(.system(size: 20, weight: .bold)).foregroundStyle(.white.opacity(0.8)).lineLimit(2)
-                                .animation(.easeInOut, value: line)
+                VStack(alignment: .leading, spacing: 0) {
+                    header.opacity(idle ? 0 : 1).allowsHitTesting(!idle)
+                    if showLyrics { lyricLines.frame(maxWidth: .infinity, maxHeight: .infinity) } else { Spacer(minLength: 0) }
+                    HStack(alignment: .bottom, spacing: 32) {
+                        ArtworkView(track: t, size: art, radius: 8)
+                            .shadow(color: .black.opacity(0.5), radius: 30, y: 14)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(t?.title ?? "")
+                                .font(.system(size: min(art * 0.24, 72), weight: .heavy))
+                                .tracking(-1)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.5)
+                            Text(t?.artist ?? "")
+                                .font(.system(size: min(art * 0.09, 26), weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.75))
+                                .lineLimit(1)
                         }
-                        Text(t?.title ?? "").font(.system(size: 56, weight: .heavy)).lineLimit(2).minimumScaleFactor(0.5)
-                        Text(t?.artist ?? "").font(.system(size: 22, weight: .semibold)).foregroundStyle(.white.opacity(0.75))
+                        Spacer(minLength: 0)
                     }
-                    Spacer()
-                    if let t { LikeButton(track: t, size: 26) }
+                    .padding(.bottom, 28)
+                    bottomBar.opacity(idle ? 0 : 1).allowsHitTesting(!idle)
                 }
-                Controls(big: true)
-                    .padding(.top, 36)
+                .padding(.horizontal, 56)
+                .padding(.top, 40)
+                .padding(.bottom, 40)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
-            .padding(48)
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
         }
         .foregroundStyle(.white)
+        .background(Color.black)
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.4), value: idle)
+        .animation(.easeInOut(duration: 0.3), value: showLyrics)
+        .onContinuousHover { _ in wake() }
+        .onTapGesture { wake() }
+        .onExitCommand(perform: close)
+        .task {
+            // Đứng yên chuột 3 giây (khi đang phát) → ẩn nút điều khiển và con trỏ.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                if !idle, player.isPlaying, Date().timeIntervalSince(lastMove) > 3 {
+                    idle = true
+                    NSCursor.setHiddenUntilMouseMoves(true)
+                }
+            }
+        }
+        .task(id: t?.id) { if let t, lyrics.trackID != t.id { lyrics.load(t) } }
         .onAppear {
             if let w = NSApp.keyWindow, !w.styleMask.contains(.fullScreen) {
                 w.toggleFullScreen(nil)
                 enteredFullScreen = true
             }
         }
-        .task(id: t?.id) { if let t, lyrics.trackID != t.id { lyrics.load(t) } }
+        // Thoát bằng nút xanh / Esc của macOS → đóng luôn chế độ này.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
+            enteredFullScreen = false
+            close()
+        }
     }
 
-    private var currentLyric: String? {
-        guard case .found(let lines, true, _) = lyrics.state, lyrics.trackID == player.current?.id,
-              let i = lyrics.currentLine(at: player.time) else { return nil }
-        return lines[i].text.nilIfEmpty
+    private func wake() {
+        lastMove = .now
+        if idle { idle = false }
+    }
+
+    /// Ảnh bìa phóng to làm mờ, luôn vừa khít khung.
+    private func backdrop(_ t: Track?, size: CGSize) -> some View {
+        ZStack {
+            if let img = MusicLibrary.shared.artwork(t) {
+                Image(platformImage: img)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size.width, height: size.height)
+                    .blur(radius: 70)
+                    .opacity(0.6)
+            }
+            LinearGradient(colors: [.black.opacity(0.55), .black.opacity(0.25), .black.opacity(0.9)],
+                           startPoint: .top, endPoint: .bottom)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipped()
+    }
+
+    private var header: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform.circle.fill").font(.system(size: 30)).foregroundStyle(Brand.accent)
+            if let ctx = player.contextTitle {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("Đang phát từ")).font(.system(size: 11, weight: .bold)).foregroundStyle(.white.opacity(0.7))
+                    Text(ctx).font(.system(size: 15, weight: .bold)).lineLimit(1)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    /// Dòng trước (mờ) · dòng đang hát (to) · dòng sau (mờ).
+    @ViewBuilder
+    private var lyricLines: some View {
+        if case .found(let lines, true, _) = lyrics.state, lyrics.trackID == player.current?.id {
+            let i = lyrics.currentLine(at: player.time) ?? -1
+            VStack(alignment: .leading, spacing: 18) {
+                ForEach(max(i - 1, 0)...min(max(i, 0) + 2, lines.count - 1), id: \.self) { k in
+                    Text(lines[k].text.isEmpty ? "♪" : lines[k].text)
+                        .font(.system(size: k == i ? 44 : 32, weight: .bold))
+                        .foregroundStyle(.white.opacity(k == i ? 1 : 0.4))
+                        .lineLimit(2)
+                        .onTapGesture { if let s = lyrics.seekTime(for: lines[k]) { player.seek(to: s) } }
+                }
+            }
+            .animation(.easeInOut(duration: 0.35), value: i)
+            .padding(.vertical, 24)
+        } else {
+            Text(lyrics.state == .loading ? L("Đang tải…") : L("Rất tiếc, chưa có lời cho bài hát này"))
+                .font(.system(size: 28, weight: .bold)).foregroundStyle(.white.opacity(0.6))
+        }
+    }
+
+    private var bottomBar: some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                Text(formatTime(scrub ?? player.time)).frame(width: 48, alignment: .trailing)
+                ScrubBar(value: player.duration > 0 ? (scrub ?? player.time) / player.duration : 0,
+                         onChanged: { scrub = $0 * player.duration },
+                         onCommit: { player.seek(to: $0 * player.duration); scrub = nil })
+                Text(formatTime(player.duration)).frame(width: 48, alignment: .leading)
+            }
+            .font(.system(size: 12)).monospacedDigit().foregroundStyle(.white.opacity(0.7))
+
+            // ⊕ bên trái · điều khiển ở giữa · lời bài hát, âm lượng, thoát bên phải.
+            ZStack {
+                HStack(spacing: 6) {
+                    if let t = player.current { LikeButton(track: t, size: 22) }
+                    Spacer()
+                    IconButton(symbol: "music.mic", active: showLyrics, size: 17, help: L("Lời bài hát")) { showLyrics.toggle() }
+                    IconButton(symbol: volumeSymbol, size: 17, help: player.volume == 0 ? L("Bật tiếng") : L("Tắt tiếng")) {
+                        if player.volume > 0 { lastVolume = player.volume; player.volume = 0 } else { player.volume = max(lastVolume, 0.2) }
+                    }
+                    ScrubBar(value: Double(player.volume), onChanged: { player.volume = Float($0) }, onCommit: { player.volume = Float($0) })
+                        .frame(width: 110)
+                    IconButton(symbol: "arrow.down.right.and.arrow.up.left", size: 17, help: L("Thoát toàn màn hình (Esc)"), action: close)
+                        .padding(.leading, 6)
+                }
+                HStack(spacing: 30) {
+                    IconButton(symbol: "shuffle", active: player.shuffle, size: 20, help: L("Phát ngẫu nhiên")) { player.shuffle.toggle() }
+                    IconButton(symbol: "backward.end.fill", size: 24, help: L("Bài trước")) { player.previous() }
+                    CenterPlayButton(size: 60)
+                    IconButton(symbol: "forward.end.fill", size: 24, help: L("Bài tiếp")) { player.next() }
+                    IconButton(symbol: player.repeatMode == .one ? "repeat.1" : "repeat", active: player.repeatMode != .off,
+                               size: 20, help: L("Lặp lại")) { player.cycleRepeat() }
+                }
+            }
+        }
+    }
+
+    private var volumeSymbol: String {
+        switch player.volume {
+        case 0: "speaker.slash.fill"
+        case ..<0.34: "speaker.wave.1.fill"
+        case ..<0.67: "speaker.wave.2.fill"
+        default: "speaker.wave.3.fill"
+        }
     }
 
     private func close() {
-        if enteredFullScreen, let w = NSApp.keyWindow, w.styleMask.contains(.fullScreen) { w.toggleFullScreen(nil) }
+        NSCursor.unhide()
+        if enteredFullScreen, let w = NSApp.keyWindow ?? NSApp.mainWindow, w.styleMask.contains(.fullScreen) {
+            enteredFullScreen = false
+            w.toggleFullScreen(nil)
+        }
         withAnimation(.easeInOut(duration: 0.3)) { UIState.shared.fullScreen = false }
     }
 }

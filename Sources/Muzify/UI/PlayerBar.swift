@@ -136,7 +136,7 @@ struct Controls: View {
 }
 
 /// Nút phát tròn trắng: rê chuột phóng to; đang lấy link thì hiện vòng xoay.
-private struct CenterPlayButton: View {
+struct CenterPlayButton: View {
     @ObservedObject private var player = MusicPlayer.shared
     var size: CGFloat = 34
     @State private var hovering = false

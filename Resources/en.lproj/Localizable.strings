@@ -270,7 +270,7 @@
 "Đang kết nối…" = "Connecting…";
 "Đang lấy thông tin…" = "Getting info…";
 "Đang phát" = "Now playing";
-"Đang phát từ %@" = "Playing from %@";
+"Đang phát từ" = "PLAYING FROM";
 "Đang theo dõi" = "Following";
 "Đang tải xuống" = "Downloading";
 "Đang tải xuống %@ bài hát" = "Downloading %@ songs";
