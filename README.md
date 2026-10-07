@@ -31,6 +31,21 @@
 
 The iOS app is fully standalone — it does not need the Mac app.
 
+<p align="center">
+  <img src="docs/images/iphone-home.png" height="420" alt="Muzify on iPhone">
+  &nbsp;
+  <img src="docs/images/ipad-home.png" height="420" alt="Muzify on iPad">
+</p>
+
+## Download
+
+Get the latest build from [**Releases**](https://github.com/not2pixel/Muzify/releases/latest):
+
+- **macOS** — `Muzify.zip`: unzip and drag `Muzify.app` to Applications. The app is not notarized, so the first time **right-click → Open**.
+- **iPhone / iPad** — `Muzify.ipa` (unsigned): install with [AltStore](https://altstore.io) or [Sideloadly](https://sideloadly.io); on Apple Silicon Macs you can also run it with [PlayCover](https://playcover.io).
+
+Every push to `main` is built by GitHub Actions (macOS app, iOS app, and a smoke test on iPhone and iPad simulators).
+
 ## Features
 
 - **Search everything at once** — your local music + YouTube Music in one list, duplicates removed. SoundCloud and a custom API are also available.

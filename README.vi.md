@@ -23,6 +23,21 @@
 
 Bản iOS chạy độc lập, không cần app trên Mac.
 
+<p align="center">
+  <img src="docs/images/iphone-home.png" height="420" alt="Muzify trên iPhone">
+  &nbsp;
+  <img src="docs/images/ipad-home.png" height="420" alt="Muzify trên iPad">
+</p>
+
+## Tải về
+
+Tải bản mới nhất ở [**Releases**](https://github.com/not2pixel/Muzify/releases/latest):
+
+- **macOS** — `Muzify.zip`: giải nén rồi kéo `Muzify.app` vào Applications. App chưa được Apple công chứng nên lần đầu **chuột phải → Mở**.
+- **iPhone / iPad** — `Muzify.ipa` (chưa ký): cài bằng [AltStore](https://altstore.io) hoặc [Sideloadly](https://sideloadly.io); trên Mac Apple Silicon có thể chạy bằng [PlayCover](https://playcover.io).
+
+Mỗi lần push lên `main`, GitHub Actions tự build (app macOS, app iOS, và chạy thử trên máy ảo iPhone + iPad).
+
 ## Tính năng
 
 - **Tìm một lần, đủ mọi nguồn** — nhạc trên máy + YouTube Music trong một danh sách, bỏ bài trùng. Có thêm SoundCloud và API riêng.
