@@ -1,0 +1,50 @@
+# Build Muzify for macOS (.zip) and iPhone/iPad (.ipa, unsigned).
+# Every push builds and uploads artifacts; pushing a tag "v*" also publishes a GitHub Release.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Translations
+        run: python3 Scripts/l10n.py check
+
+      - name: macOS app
+        run: ./build.sh
+
+      - name: iOS app
+        run: Scripts/build_ios.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Muzify
+          path: |
+            build/Muzify.zip
+            build/Muzify.ipa
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/Muzify.zip
+            build/Muzify.ipa
+          generate_release_notes: true
