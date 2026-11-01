@@ -28,14 +28,24 @@ actor SponsorBlock {
     }
 }
 
-// MARK: - Thông tin nghệ sĩ: ảnh + người hâm mộ (Deezer) + tiểu sử, ảnh dự phòng (Wikipedia) — đều không cần key
-// Lưu ý: Deezer bị nhà mạng Việt Nam chặn (DNS trả 127.0.0.1) → khi đó ảnh lấy từ Wikipedia, số người hâm mộ ẩn đi.
+// MARK: - Thông tin nghệ sĩ: lấy đúng từ trang nghệ sĩ trên YouTube Music
+// (ảnh, mô tả, người nghe hằng tháng, người đăng ký, bài hát hàng đầu).
 
 struct ArtistInfo: Equatable {
+    var channelID: String
+    var name: String
+    /// Ảnh đại diện vuông (như ảnh tròn trên YouTube Music).
     var picture: String?
-    var fans: Int?
+    /// Ảnh bìa ngang của trang nghệ sĩ.
+    var banner: String?
+    /// "9,29 Tr khán thính giả mỗi tháng" — nguyên văn từ YouTube.
+    var listeners: String?
+    var subscribers: String?
     var bio: String?
-    var wikiURL: String?
+    var songs: [Track]
+    /// Playlist "Xem tất cả" bài hát của nghệ sĩ.
+    var allSongs: String?
+    var url: String { "https://music.youtube.com/channel/\(channelID)" }
 }
 
 @MainActor
@@ -45,64 +55,62 @@ final class ArtistInfoStore: ObservableObject {
     private var loading = Set<String>()
 
     /// Trả về ngay nếu đã có; chưa có thì tải nền rồi cập nhật giao diện.
-    func info(_ name: String) -> ArtistInfo? {
+    func info(_ name: String, channelID: String? = nil) -> ArtistInfo? {
         let key = name.lowercased()
         guard !key.isEmpty else { return nil }
         if let i = infos[key] { return i }
         guard !loading.contains(key) else { return nil }
         loading.insert(key)
-        let lang = AppLanguage.current
+        let cid = channelID ?? MusicLibrary.shared.artists.first { $0.id == key }?.channelID
         Task {
-            async let deezer = Self.deezer(name)
-            async let wiki = Self.wikipedia(name, lang: lang)
-            let (d, w) = await (deezer, wiki)
-            infos[key] = ArtistInfo(picture: d?.picture ?? w?.image, fans: d?.fans, bio: w?.bio, wikiURL: w?.url)
+            if let i = try? await YTM.artist(name: name, channelID: cid) { infos[key] = i }
             loading.remove(key)
         }
         return nil
     }
+}
 
-    private nonisolated static func json(_ url: URL) async -> Any? {
-        var req = URLRequest(url: url)
-        req.timeoutInterval = 10
-        req.setValue("Muzify/1.0 (macOS music player)", forHTTPHeaderField: "User-Agent")
-        guard let (data, resp) = try? await URLSession.shared.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return try? JSONSerialization.jsonObject(with: data)
-    }
-
-    private nonisolated static func same(_ a: String, _ b: String) -> Bool {
-        func n(_ s: String) -> String { s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).filter { $0.isLetter || $0.isNumber } }
-        return n(a) == n(b)
-    }
-
-    private nonisolated static func deezer(_ name: String) async -> (picture: String?, fans: Int?)? {
-        var c = URLComponents(string: "https://api.deezer.com/search/artist")!
-        c.queryItems = [.init(name: "q", value: name), .init(name: "limit", value: "5")]
-        guard let obj = await json(c.url!) as? [String: Any], let list = obj["data"] as? [[String: Any]],
-              let a = list.first(where: { same($0["name"] as? String ?? "", name) }) else { return nil }
-        return (a["picture_xl"] as? String, a["nb_fan"] as? Int)
-    }
-
-    private nonisolated static func wikipedia(_ name: String, lang: String) async -> (bio: String, url: String?, image: String?)? {
-        let hint = lang == "en" ? "singer" : "ca sĩ" // l10n:skip — từ khoá tìm kiếm
-        var c = URLComponents(string: "https://\(lang).wikipedia.org/w/api.php")!
-        c.queryItems = [.init(name: "action", value: "query"), .init(name: "list", value: "search"), .init(name: "format", value: "json"),
-                        .init(name: "srlimit", value: "3"), .init(name: "srsearch", value: "\(name) \(hint)")]
-        guard let obj = await json(c.url!) as? [String: Any],
-              let hits = (obj["query"] as? [String: Any])?["search"] as? [[String: Any]] else { return nil }
-        for hit in hits {
-            guard let title = hit["title"] as? String,
-                  let enc = title.replacingOccurrences(of: " ", with: "_").addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
-                  let u = URL(string: "https://\(lang).wikipedia.org/api/rest_v1/page/summary/\(enc)"),
-                  let s = await json(u) as? [String: Any], let text = s["extract"] as? String,
-                  (s["type"] as? String) != "disambiguation",
-                  text.localizedCaseInsensitiveContains(name.components(separatedBy: " ").first ?? name)
-            else { continue }
-            let url = ((s["content_urls"] as? [String: Any])?["desktop"] as? [String: Any])?["page"] as? String
-            let image = ((s["originalimage"] as? [String: Any]) ?? (s["thumbnail"] as? [String: Any]))?["source"] as? String
-            return (text, url, image)
+extension YTM {
+    /// Trang nghệ sĩ trên YouTube Music (tìm kênh theo tên nếu chưa biết ID kênh).
+    static func artist(name: String, channelID: String? = nil) async throws -> ArtistInfo? {
+        var cid = channelID
+        var avatar: String?
+        if cid == nil || avatar == nil {
+            let found = try await call("search", ["query": name, "params": "EgWKAQIgAWoKEAkQBRAKEAMQBA=="]) // bộ lọc: Nghệ sĩ
+            func norm(_ s: String) -> String {
+                s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).filter { $0.isLetter || $0.isNumber }
+            }
+            var candidates: [(id: String, name: String, art: String?)] = []
+            for r in all("musicResponsiveListItemRenderer", in: found) {
+                guard let id = all("browseEndpoint", in: r).first?["browseId"] as? String, id.hasPrefix("UC") else { continue }
+                let cols = (r["flexColumns"] as? [[String: Any]]) ?? []
+                let n = cols.first.map { runs(($0["musicResponsiveListItemFlexColumnRenderer"] as? [String: Any])?["text"]) } ?? ""
+                candidates.append((id, n, thumb(r["thumbnail"], size: 544)))
+            }
+            let pick = (cid.flatMap { c in candidates.first { $0.id == c } })
+                ?? candidates.first { norm($0.name) == norm(name) } ?? candidates.first
+            cid = cid ?? pick?.id
+            avatar = pick?.id == cid ? pick?.art : nil
         }
-        return nil
+        guard let cid else { return nil }
+        let page = try await call("browse", ["browseId": cid])
+        guard let h = all("musicImmersiveHeaderRenderer", in: page).first ?? all("musicVisualHeaderRenderer", in: page).first
+        else { return nil }
+        var bannerURLs: [String] = []
+        if let list = ((h["thumbnail"] as? [String: Any]).flatMap { all("musicThumbnailRenderer", in: $0).first ?? $0 })?["thumbnail"] as? [String: Any],
+           let ts = list["thumbnails"] as? [[String: Any]] {
+            bannerURLs = ts.compactMap { $0["url"] as? String }
+        }
+        let shelf = all("musicShelfRenderer", in: page).first
+        let songs = shelf.map { all("musicResponsiveListItemRenderer", in: $0).compactMap(song(row:)) } ?? []
+        let seeAll = ((shelf?["bottomEndpoint"] as? [String: Any])?["browseEndpoint"] as? [String: Any])?["browseId"] as? String
+            ?? (shelf.flatMap { all("browseEndpoint", in: $0["title"] ?? [:]).first?["browseId"] as? String })
+        let subs = all("subscribeButtonRenderer", in: h).first.map { runs($0["subscriberCountText"]) }
+        let banner = bannerURLs.last
+        return ArtistInfo(channelID: cid, name: runs(h["title"]).nilIfEmpty ?? name,
+                          picture: avatar ?? banner, banner: banner,
+                          listeners: runs(h["monthlyListenerCount"]).nilIfEmpty, subscribers: subs?.nilIfEmpty,
+                          bio: runs(h["description"]).nilIfEmpty, songs: songs, allSongs: seeAll)
     }
 }
 

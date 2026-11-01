@@ -56,7 +56,8 @@ Every push to `main` is built by GitHub Actions (macOS app, iOS app, and a smoke
 - **Audio**: 10-band equalizer with presets, volume normalization, AirPlay output.
 - **Queue & autoplay**: play next, add to queue, shuffle that reshuffles live, repeat, keeps playing similar songs when the queue ends.
 - **Library**: playlists (drag to reorder on Mac), followed artists, import audio files, paste YouTube / YouTube Music / Spotify track links to download.
-- **Artist cards** with photo, fan count (Deezer) and bio (Wikipedia).
+- **YouTube account (optional)**: sign in to get your own YouTube Music home (Quick picks, personal mixes, your liked songs and playlists). Sync liked songs, followed artists and playlists with your account **only when you press “Sync now”** — data on your device comes first. You can also replace local data with your YouTube data, or send songs you play to your YouTube history (off by default).
+- **Artist pages** straight from YouTube Music: photo, monthly listeners, subscribers, description and top songs.
 - **Mac extras**: menu-bar mini player, always-on-top floating player, full-screen player, media keys, Spotify-style shortcuts (Space, ⌘← / ⌘→, ⌘↑ / ⌘↓, ⌘K…), Discord “Listening to…” status.
 - **English & Tiếng Việt** — follows the system language or pick one in Settings.
 

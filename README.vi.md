@@ -48,7 +48,8 @@ Mỗi lần push lên `main`, GitHub Actions tự build (app macOS, app iOS, và
 - **Âm thanh**: EQ 10 dải có sẵn các kiểu, tự cân âm lượng, chọn loa AirPlay.
 - **Danh sách chờ & tự động phát**: phát tiếp theo, thêm vào danh sách chờ, trộn bài (xếp lại ngay khi bật), lặp lại, hết danh sách thì phát tiếp bài tương tự.
 - **Thư viện**: playlist (kéo để sắp xếp trên Mac), nghệ sĩ theo dõi, nhập tệp nhạc, dán link YouTube / YouTube Music / bài Spotify để tải.
-- **Thẻ nghệ sĩ** có ảnh, số người hâm mộ (Deezer) và tiểu sử (Wikipedia).
+- **Tài khoản YouTube (tuỳ chọn)**: đăng nhập để trang chủ giống YouTube Music của bạn (Chọn nhanh, mix dành riêng, bài đã thích, playlist). Đồng bộ bài đã thích, nghệ sĩ theo dõi, playlist với tài khoản **chỉ khi bấm “Đồng bộ ngay”** — dữ liệu trên máy là chính. Có thể thay dữ liệu trên máy bằng dữ liệu YouTube, hoặc ghi bài đã nghe vào lịch sử YouTube (tắt mặc định).
+- **Trang nghệ sĩ** lấy đúng từ YouTube Music: ảnh, người nghe hằng tháng, người đăng ký, mô tả, bài hát hàng đầu.
 - **Riêng Mac**: mini player trên thanh menu, cửa sổ nổi luôn ở trên, chế độ toàn màn hình, phím media, phím tắt kiểu Spotify (Space, ⌘← / ⌘→, ⌘↑ / ⌘↓, ⌘K…), trạng thái “Đang nghe…” trên Discord.
 - **Tiếng Việt & English** — theo ngôn ngữ hệ thống hoặc chọn trong Cài đặt.
 

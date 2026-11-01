@@ -320,6 +320,10 @@ struct MobileSettings: View {
                         Text(L("Mở lại Muzify để đổi ngôn ngữ."))
                     }
                 }
+                Section(L("Tài khoản YouTube")) {
+                    AccountRow()
+                    SyncStatusView()
+                }
                 Section(L("Tìm kiếm & nghe online")) {
                     Picker(L("Kho nhạc"), selection: $settings.provider) {
                         ForEach(CatalogProvider.allCases) { Text($0.title).tag($0) }

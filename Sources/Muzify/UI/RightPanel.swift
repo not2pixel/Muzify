@@ -140,7 +140,7 @@ private struct NowPlayingPanel: View {
         return VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 Group {
-                    if let pic = info?.picture { RemoteImage(url: pic, placeholder: "person.fill") }
+                    if let pic = info?.banner ?? info?.picture { RemoteImage(url: pic, placeholder: "person.fill") }
                     else { ArtworkView(track: t, size: 288, radius: 0) }
                 }
                 .frame(maxWidth: .infinity, maxHeight: 200)
@@ -153,11 +153,10 @@ private struct NowPlayingPanel: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(name).font(.system(size: 16, weight: .bold)).lineLimit(1)
+                        Text(info?.name ?? name).font(.system(size: 16, weight: .bold)).lineLimit(1)
                             .onTapGesture { UIState.shared.openArtist(name) }
-                        if let fans = info?.fans, fans > 0 {
-                            Text(L("\(fans.formatted(.number.locale(.app))) người hâm mộ"))
-                                .font(.system(size: 13)).foregroundStyle(MZ.subtext)
+                        if let l = info?.listeners ?? info?.subscribers {
+                            Text(l).font(.system(size: 13)).foregroundStyle(MZ.subtext).lineLimit(1)
                         }
                     }
                     Spacer()
@@ -167,9 +166,9 @@ private struct NowPlayingPanel: View {
                 }
                 if let bio = info?.bio {
                     Text(bio).font(.system(size: 13)).foregroundStyle(MZ.subtext).lineLimit(4)
-                    if let w = info?.wikiURL, let u = URL(string: w) {
-                        Link(L("Đọc thêm trên Wikipedia"), destination: u).font(.system(size: 12, weight: .semibold))
-                    }
+                }
+                if let info, let u = URL(string: info.url) {
+                    Link(L("Mở trên YouTube Music"), destination: u).font(.system(size: 12, weight: .semibold))
                 }
             }
             .padding(16)

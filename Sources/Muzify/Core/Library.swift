@@ -140,6 +140,64 @@ final class MusicLibrary: ObservableObject {
         }
     }
 
+    /// Bỏ toàn bộ dữ liệu trên máy (thư viện, nhạc đã tải, lịch sử) — sao lưu vào Backups/<thời điểm>/ trước.
+    @discardableResult
+    func resetAll() -> URL {
+        let fm = FileManager.default
+        let backup = dir.appendingPathComponent("Backups/" + Date().formatted(.iso8601.year().month().day().time(includingFractionalSeconds: false))
+            .replacingOccurrences(of: ":", with: "-"), isDirectory: true)
+        try? fm.createDirectory(at: backup, withIntermediateDirectories: true)
+        try? fm.copyItem(at: indexURL, to: backup.appendingPathComponent("library.json"))
+        for d in [tracksDir, artDir] {
+            let dest = backup.appendingPathComponent(d.lastPathComponent)
+            try? fm.moveItem(at: d, to: dest)
+            try? fm.createDirectory(at: d, withIntermediateDirectories: true)
+        }
+        MusicPlayer.shared.stop()
+        MusicPlayer.shared.clearHistory()
+        artCache = [:]
+        transient = [:]
+        jobs = []
+        tracks = []
+        playlists = []
+        artists = []
+        return backup
+    }
+
+    /// Bài đã thích kéo từ YouTube (mới nhất trước) — thêm vào đầu, giữ đúng thứ tự.
+    func applyRemoteLikes(_ list: [Track]) {
+        var fresh: [Track] = []
+        for (n, t) in list.enumerated() {
+            if let i = libraryIndex(of: t) {
+                tracks[i].liked = true
+            } else {
+                var x = t
+                x.liked = true
+                x.addedAt = Date().addingTimeInterval(-Double(n))
+                fresh.append(x)
+            }
+        }
+        if !fresh.isEmpty { tracks.insert(contentsOf: fresh, at: 0) }
+    }
+
+    /// Playlist kéo từ YouTube: tạo hoặc cập nhật playlist có cùng ytID (YouTube là bản chuẩn).
+    func applyRemotePlaylist(ytID: String, name: String, tracks list: [Track]) {
+        let ids = list.map { persist($0) }
+        var seen = Set<UUID>()
+        let unique = ids.filter { seen.insert($0).inserted }
+        if let i = playlists.firstIndex(where: { $0.ytID == ytID }) {
+            let removed = playlists[i].trackIDs.filter { !seen.contains($0) }
+            if !name.isEmpty { playlists[i].name = name }
+            if playlists[i].trackIDs != unique { playlists[i].trackIDs = unique }
+            removed.forEach(prune)
+        } else {
+            var p = Playlist(name: name.isEmpty ? L("Playlist mới") : name)
+            p.trackIDs = unique
+            p.ytID = ytID
+            playlists.append(p)
+        }
+    }
+
     /// Đảm bảo bài có trong thư viện (để thêm vào playlist), trả về id trong thư viện.
     @discardableResult
     func persist(_ t: Track) -> UUID {

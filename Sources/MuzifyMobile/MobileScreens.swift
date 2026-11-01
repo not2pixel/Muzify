@@ -74,6 +74,7 @@ struct HomeScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                if settings.provider != .off { AccountPrompt() }
                 quickGrid
                 if settings.provider == .off {
                     Text(L("Bật YouTube Music trong Cài đặt để xem gợi ý và bảng xếp hạng.")).foregroundStyle(MZ.subtext)
@@ -526,8 +527,11 @@ struct RemoteScreen: View {
                     Text(page.subtitle.isEmpty ? L("\(page.tracks.count) bài hát") : "\(page.subtitle) • " + L("\(page.tracks.count) bài hát")) // l10n:skip
                         .font(.system(size: 13)).foregroundStyle(MZ.subtext)
                 }
-                if case .artist(let name) = target {
-                    if let bio = artists.info(name)?.bio {
+                if case .artist(let name) = target, let info = artists.info(name) {
+                    if let l = info.listeners ?? info.subscribers {
+                        Text(l).font(.system(size: 14, weight: .semibold)).foregroundStyle(MZ.text)
+                    }
+                    if let bio = info.bio {
                         Text(bio).font(.system(size: 13)).foregroundStyle(MZ.subtext).lineLimit(4)
                     }
                 }

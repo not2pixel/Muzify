@@ -13,14 +13,34 @@ enum YTM {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
         req.setValue(Catalog.browserUA, forHTTPHeaderField: "User-Agent")
+        // Đã đăng nhập YouTube → gợi ý, bài đã thích, playlist theo tài khoản.
+        if !mobile, let auth = YTAccount.authHeaders() {
+            for (k, v) in auth { req.setValue(v, forHTTPHeaderField: k) }
+        }
         var b = body
         // Client di động trả về lời bài hát có mốc thời gian (web chỉ có lời thường).
         b["context"] = ["client": mobile
             ? ["clientName": "ANDROID_MUSIC", "clientVersion": "7.21.50", "androidSdkVersion": 30, "hl": AppLanguage.current, "gl": "VN"] as [String: Any]
             : ["clientName": "WEB_REMIX", "clientVersion": "1.20241023.01.00", "hl": AppLanguage.current, "gl": "VN"]]
         req.httpBody = try JSONSerialization.data(withJSONObject: b)
-        let (data, _) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 200
+        if code == 401 || code == 403 { throw MusicError.message(L("Phiên đăng nhập YouTube đã hết hạn — hãy đăng nhập lại.")) }
+        guard code < 400 else { throw MusicError.message("YouTube Music \(code)") }
         return try JSONSerialization.jsonObject(with: data)
+    }
+
+    /// Duyệt một trang và mọi trang tiếp theo (danh sách dài: bài đã thích, playlist…).
+    static func browseAll(_ browseID: String, maxPages: Int = 80) async throws -> [Any] {
+        var pages: [Any] = [try await call("browse", ["browseId": browseID])]
+        var seen = Set<String>()
+        while pages.count < maxPages, let last = pages.last {
+            let token = (all("continuationCommand", in: last).first?["token"] as? String)
+                ?? (all("nextContinuationData", in: last).first?["continuation"] as? String)
+            guard let token, seen.insert(token).inserted else { break }
+            pages.append(try await call("browse", ["continuation": token]))
+        }
+        return pages
     }
 
     // MARK: Đọc JSON
@@ -216,6 +236,15 @@ enum HomeTarget: Hashable {
             return YTM.Page(title: title, subtitle: L("Bắt đầu từ \(LyricsStore.searchTerms(for: t).title)"),
                             art: t.artworkURL, tracks: try await YTM.related(to: t))
         case .artist(let a):
+            // Đúng trang nghệ sĩ trên YouTube Music: bài hát hàng đầu ("Xem tất cả" nếu có).
+            if let info = try? await YTM.artist(name: a) {
+                var list = info.songs
+                if let all = info.allSongs, let full = try? await YTM.playlist(all).tracks, !full.isEmpty { list = full }
+                if !list.isEmpty {
+                    return YTM.Page(title: info.name, subtitle: info.listeners ?? info.subscribers ?? "",
+                                    art: info.picture, tracks: list)
+                }
+            }
             let found = try await YTM.songs(of: a)
             // Chỉ giữ bài của đúng nghệ sĩ (kết quả tìm kiếm có thể lẫn người khác).
             let own = found.filter { $0.artist.localizedCaseInsensitiveContains(a) }
@@ -266,9 +295,14 @@ final class MusicHome: ObservableObject {
     private var charts: [HomeShelf] = []
     private var fresh: [HomeShelf] = []
     private var pending = 0
+    /// Đã đăng nhập YouTube: bài đã thích + playlist của tài khoản.
+    private var account: [HomeShelf] = []
 
     private func publish() {
-        shelves = mixes + recommended + ytHome + ytCharts + charts + fresh
+        // Có tài khoản → mục của YouTube (Chọn nhanh, Nghe lại, mix dành riêng…) lên đầu như trên YouTube Music.
+        shelves = YTAccount.isSignedIn
+            ? ytHome + account + mixes + recommended + ytCharts + charts + fresh
+            : mixes + recommended + ytHome + ytCharts + charts + fresh
         let all = shelves.flatMap(\.items).compactMap { if case .song(let t) = $0.kind { t } else { nil } }
         MusicLibrary.shared.remember(all)
     }
@@ -288,8 +322,16 @@ final class MusicHome: ObservableObject {
         guard !loading else { return }
         loading = true
         error = nil
-        pending = 5
+        pending = YTAccount.isSignedIn ? 6 : 5
         let seeds = seedTracks()
+        if YTAccount.isSignedIn {
+            Task {
+                account = await Self.accountShelves()
+                finish()
+            }
+        } else {
+            account = []
+        }
 
         // Mix theo nghệ sĩ bạn hay nghe: có ngay, không cần mạng.
         mixes = seeds.isEmpty ? [] : [HomeShelf(title: L("Mix hàng ngày"), subtitle: L("Mix tự tạo theo nhạc bạn nghe"),
@@ -358,6 +400,35 @@ final class MusicHome: ObservableObject {
             }
             finish()
         }
+    }
+
+    /// Xoá trang chủ cũ (đổi tài khoản).
+    func reset() {
+        ytHome = []; recommended = []; account = []; ytCharts = []; fresh = []
+        loadedAt = nil
+        publish()
+    }
+
+    /// Bài đã thích (playlist "LM") + playlist trong thư viện YouTube Music của tài khoản.
+    private static func accountShelves() async -> [HomeShelf] {
+        var out: [HomeShelf] = []
+        if let likes = try? await YTM.playlist("VLLM"), !likes.tracks.isEmpty {
+            out.append(HomeShelf(title: L("Bài đã thích trên YouTube"), subtitle: L("Từ tài khoản YouTube của bạn"),
+                                 style: .songs, items: likes.tracks.prefix(12).map(songItem)))
+        }
+        if let obj = try? await YTM.call("browse", ["browseId": "FEmusic_liked_playlists"]) {
+            let items: [HomeItem] = YTM.all("musicTwoRowItemRenderer", in: obj).compactMap { r in
+                let nav = r["navigationEndpoint"] as? [String: Any] ?? [:]
+                guard let id = (nav["browseEndpoint"] as? [String: Any])?["browseId"] as? String, id.hasPrefix("VL") else { return nil }
+                let name = YTM.runs(r["title"])
+                return HomeItem(title: name, subtitle: YTM.runs(r["subtitle"]), art: YTM.thumb(r["thumbnailRenderer"]),
+                                kind: .open(.playlist(id: id, title: name)))
+            }
+            if !items.isEmpty {
+                out.append(HomeShelf(title: L("Playlist của bạn trên YouTube"), items: items))
+            }
+        }
+        return out
     }
 
     // MARK: Lưu bảng xếp hạng trên máy

@@ -43,11 +43,15 @@ struct Playlist: Identifiable, Codable, Hashable {
     var name: String
     var trackIDs: [UUID] = []
     var createdAt = Date()
+    /// ID playlist tương ứng trên YouTube Music (đã đồng bộ), không có tiền tố "VL".
+    var ytID: String?
 }
 
 struct Artist: Identifiable, Codable, Hashable {
     var name: String
     var art: String?
+    /// ID kênh YouTube (đồng bộ đăng ký kênh).
+    var channelID: String?
     var id: String { name.lowercased() }
 }
 

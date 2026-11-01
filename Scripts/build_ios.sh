@@ -8,7 +8,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 SOURCES=(Sources/Muzify/Core/*.swift Sources/Muzify/UI/Theme.swift Sources/Muzify/UI/AppState.swift
-         Sources/Muzify/UI/Tracks.swift Sources/MuzifyMobile/*.swift)
+         Sources/Muzify/UI/Tracks.swift Sources/Muzify/UI/AccountLogin.swift Sources/MuzifyMobile/*.swift)
 MODE=${1:-ipa}
 
 python3 Scripts/l10n.py check >/dev/null || { python3 Scripts/l10n.py check; echo "✗ Thiếu bản dịch — sửa rồi build lại."; exit 1; }

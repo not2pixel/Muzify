@@ -35,4 +35,5 @@ if [ "$1" = "--install" ]; then
   rm -rf /Applications/Muzify.app
   cp -R "$APP" /Applications/
   echo "✓ Đã cài vào /Applications"
+  rm -rf "$APP"   # không để bản trùng trong build/ (Spotlight/Launchpad sẽ hiện 2 app)
 fi

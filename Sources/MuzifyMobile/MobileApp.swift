@@ -91,6 +91,7 @@ struct MobileRoot: View {
         .onAppear {
             MobileNav.shared.isPad = sizeClass == .regular
             Router.shared.handler = { MobileNav.shared.push($0) }
+            _ = AccountState.shared // đã đăng nhập YouTube → bắt đầu đồng bộ
         }
         .onChange(of: sizeClass) { _, s in MobileNav.shared.isPad = s == .regular }
     }

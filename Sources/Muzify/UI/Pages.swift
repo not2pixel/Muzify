@@ -410,6 +410,7 @@ struct RemotePageView: View {
                         ShowAllButton(expanded: showAll) { withAnimation(Brand.spring) { showAll.toggle() } }
                             .padding(.leading, 16).padding(.top, 12)
                     }
+                    if case .artist(let name) = target, let info = artists.info(name) { about(info) }
                 } else {
                     TrackTableHeader(showSource: width > 760, sourceTitle: L("Kho nhạc"))
                     LazyVStack(spacing: 0) {
@@ -451,7 +452,10 @@ struct RemotePageView: View {
                 }
             }
         } meta: {
-            if let page {
+            if let page, target.isArtist {
+                // Như YouTube Music / Spotify: số người nghe hằng tháng ngay dưới tên.
+                Text(page.subtitle).foregroundStyle(.white.opacity(0.85)).lineLimit(1)
+            } else if let page {
                 Text("Muzify").fontWeight(.bold)
                 Text(L("•\(page.subtitle.isEmpty ? "" : " \(page.subtitle) •") \(page.tracks.count) bài hát"))
                     .foregroundStyle(.white.opacity(0.8))
@@ -504,6 +508,34 @@ struct RemotePageView: View {
         .padding(.horizontal, 24)
         .padding(.vertical, 22)
         .background(LinearGradient(colors: [tint.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
+    }
+
+    /// "Giới thiệu": ảnh bìa, người nghe, người đăng ký, mô tả — đúng như trang nghệ sĩ trên YouTube Music.
+    private func about(_ info: ArtistInfo) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L("Giới thiệu")).font(.system(size: 24, weight: .bold))
+            ZStack(alignment: .bottomLeading) {
+                RemoteImage(url: info.banner ?? info.picture, placeholder: "person.fill")
+                    .frame(maxWidth: 760, minHeight: 300, maxHeight: 300)
+                    .clipped()
+                LinearGradient(colors: [.clear, .black.opacity(0.85)], startPoint: .center, endPoint: .bottom)
+                VStack(alignment: .leading, spacing: 8) {
+                    if let l = info.listeners { Text(l).font(.system(size: 16, weight: .bold)) }
+                    if let s = info.subscribers { Text(L("\(s) người đăng ký")).font(.system(size: 13)).foregroundStyle(.white.opacity(0.8)) }
+                    if let bio = info.bio {
+                        Text(bio).font(.system(size: 14)).foregroundStyle(.white.opacity(0.9)).lineLimit(4)
+                    }
+                    if let u = URL(string: info.url) {
+                        Link(L("Mở trên YouTube Music"), destination: u).font(.system(size: 13, weight: .semibold))
+                    }
+                }
+                .foregroundStyle(.white)
+                .padding(24)
+            }
+            .frame(maxWidth: 760, alignment: .leading)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .padding(.top, 36)
     }
 
     private var kindLabel: String {

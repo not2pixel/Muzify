@@ -7,6 +7,7 @@ struct SettingsView: View {
         TabView {
             PlaybackSettings().tabItem { Label(L("Phát nhạc"), systemImage: "play.circle") }
             AudioSettingsView().tabItem { Label(L("Âm thanh"), systemImage: "slider.vertical.3") }
+            AccountSettings().tabItem { Label(L("Tài khoản"), systemImage: "person.crop.circle") }
             LibrarySettings().tabItem { Label(L("Thư viện"), systemImage: "books.vertical") }
             DiscordSettings().tabItem { Label("Discord", systemImage: "bubble.left.and.bubble.right") }
         }
@@ -224,5 +225,23 @@ private struct AudioSettingsView: View {
             Text(f >= 1000 ? "\(Int(f / 1000))k" : "\(Int(f))").font(.system(size: 10)).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct AccountSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                AccountRow()
+                SyncStatusView()
+            } header: {
+                Text(L("Tài khoản YouTube"))
+            } footer: {
+                Text(L("Muzify chỉ giữ phiên đăng nhập (cookie youtube.com) trong Keychain của máy và chỉ gửi nó tới YouTube. Đăng xuất để xoá.") + "\n" + L("Dữ liệu trên máy là chính. Bấm “Đồng bộ ngay” để gộp với YouTube (bài đã thích, nghệ sĩ theo dõi, playlist); khi khác nhau, bên máy thắng."))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .frame(height: 380)
     }
 }

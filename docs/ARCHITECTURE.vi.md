@@ -26,7 +26,9 @@ Muzify là app SwiftUI thuần. Bản macOS là một Swift Package (không có 
 | `Catalog.swift` | Các kho nhạc (tất cả nguồn, YouTube Music, SoundCloud, API riêng), tìm kiếm gộp bỏ trùng, bộ nhớ ảnh `RemoteArt`, SoundCloud API v2 |
 | `Lyrics.swift` | `LyricsStore`: ưu tiên YouTube Music, dự phòng LRCLIB, đọc LRC, lưu đệm, tự bù lệch khi intro bị bỏ qua |
 | `Equalizer.swift` | `AudioSettings` + `MTAudioProcessingTap`: EQ biquad 10 dải, tự cân âm lượng, chống vỡ tiếng |
-| `Extras.swift` | Đoạn SponsorBlock, thông tin nghệ sĩ (Deezer + Wikipedia), bảng xếp hạng (Apple Music RSS, Deezer) |
+| `Extras.swift` | Đoạn SponsorBlock, thông tin nghệ sĩ lấy từ trang nghệ sĩ YouTube Music, bảng xếp hạng (Apple Music RSS, Deezer) |
+| `YTAccount.swift` | Đăng nhập YouTube (tuỳ chọn): cookie trong Keychain, ký yêu cầu InnerTube bằng SAPISIDHASH, thông tin tài khoản |
+| `YTSync.swift` | Đồng bộ với tài khoản YouTube khi bấm nút (bài đã thích, kênh đăng ký, playlist; máy thắng), thay dữ liệu trên máy bằng dữ liệu YouTube, ghi lịch sử nghe (tuỳ chọn) |
 | `Discord.swift` | Discord Rich Presence qua IPC cục bộ (chỉ macOS) |
 | `Localization.swift` | `L("…")`, chọn ngôn ngữ app |
 | `Platform.swift` | Khác biệt macOS/iOS: `PlatformImage`, mở link, sao chép |

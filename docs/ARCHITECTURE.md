@@ -26,7 +26,9 @@ Muzify is a pure SwiftUI app. The macOS app is a Swift Package (no Xcode project
 | `Catalog.swift` | Catalog providers (all sources, YouTube Music, SoundCloud, custom API), merged search with de-duplication, `RemoteArt` image cache, SoundCloud API v2 |
 | `Lyrics.swift` | `LyricsStore`: YouTube Music first, LRCLIB fallback, LRC parsing, cache, automatic offset when an intro was skipped |
 | `Equalizer.swift` | `AudioSettings` + `MTAudioProcessingTap`: 10-band biquad EQ, volume normalization, clipping guard |
-| `Extras.swift` | SponsorBlock segments, artist info (Deezer + Wikipedia), charts (Apple Music RSS, Deezer) |
+| `Extras.swift` | SponsorBlock segments, artist info from the YouTube Music artist page, charts (Apple Music RSS, Deezer) |
+| `YTAccount.swift` | Optional YouTube sign-in: cookies in the Keychain, SAPISIDHASH-signed InnerTube requests, account profile |
+| `YTSync.swift` | Manual sync with the YouTube account (liked songs, subscriptions, playlists; local data wins), replace local data with YouTube data, optional history reporting |
 | `Discord.swift` | Discord Rich Presence over local IPC (macOS only) |
 | `Localization.swift` | `L("…")` lookup, app language selection |
 | `Platform.swift` | macOS/iOS differences: `PlatformImage`, open URL, copy to clipboard |

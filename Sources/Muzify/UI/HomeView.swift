@@ -46,6 +46,8 @@ struct HomeView: View {
                         .help(L("Làm mới gợi ý"))
                 }
 
+                if settings.provider != .off { AccountPrompt() }
+
                 if tab != .artists { quickGrid }
 
                 if settings.provider == .off {

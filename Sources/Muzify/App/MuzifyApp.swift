@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             _ = MusicLibrary.shared
             _ = MusicPlayer.shared
             Presence.shared.start()
+            _ = AccountState.shared // đã đăng nhập YouTube → bắt đầu đồng bộ
         }
         // Phím cách = phát/tạm dừng (khi không gõ chữ), giống Spotify.
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in

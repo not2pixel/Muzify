@@ -105,6 +105,11 @@ final class MusicPlayer: ObservableObject {
                 }
                 self.updateNowPlaying()
                 self.watchdog()
+                // Đã nghe ≥ 30 giây → ghi vào lịch sử YouTube (gợi ý học theo).
+                if !self.reported, self.isPlaying, self.time >= 30, let t = self.current {
+                    self.reported = true
+                    YTSync.shared.reportPlay(t)
+                }
             }
         }
         endObserver = NotificationCenter.default.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: nil, queue: .main) { [weak self] n in
@@ -155,6 +160,8 @@ final class MusicPlayer: ObservableObject {
     }
 
     private var pendingSeek: Double?
+    /// Bài hiện tại đã được ghi vào lịch sử YouTube chưa.
+    private var reported = false
 
     /// Theo dõi trạng thái bài vừa nạp: lỗi → thử lại; sẵn sàng → tua tới chỗ cũ nếu đang phục hồi.
     private func watch(_ item: AVPlayerItem, _ t: Track) {
@@ -368,7 +375,7 @@ final class MusicPlayer: ObservableObject {
         guard queue.indices.contains(i) else { return }
         index = i
         guard let t = current else { removeFromQueue(queue[i]); return }
-        if !keepRetries { retries = 0; pendingSeek = nil }
+        if !keepRetries { retries = 0; pendingSeek = nil; reported = false }
         lastProgress = .now
         lastTime = -1
         Log.write("load '\(t.title)' \(t.isRemote ? (t.remoteURL ?? "").prefix(60) : "file") autoplay=\(autoplay)")
@@ -426,6 +433,11 @@ final class MusicPlayer: ObservableObject {
 
     private func trackEnded() {
         if repeatMode == .one { seek(to: 0); player.play() } else { next() }
+    }
+
+    func clearHistory() {
+        history = []
+        UserDefaults.standard.removeObject(forKey: "history")
     }
 
     private func addToHistory(_ t: Track) {
