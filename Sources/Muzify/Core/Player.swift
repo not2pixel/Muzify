@@ -401,7 +401,8 @@ final class MusicPlayer: ObservableObject {
                 let asset = AVURLAsset(url: info.url, options: info.headers.isEmpty ? nil
                                        : ["AVURLAssetHTTPHeaderFieldsKey": info.headers])
                 let item = AVPlayerItem(asset: asset)
-                Equalizer.attach(to: item)
+                Log.write("gain '\(t.title)' \(MusicLibrary.shared.normalizeGain(for: t).map { String(format: "%.1f dB", $0) } ?? "none")")
+                Equalizer.attach(to: item, gainDB: MusicLibrary.shared.normalizeGain(for: t))
                 player.replaceCurrentItem(with: item)
                 watch(item, t)
                 if isPlaying { player.play() }
@@ -410,7 +411,7 @@ final class MusicPlayer: ObservableObject {
         }
         isResolving = false
         let item = AVPlayerItem(url: MusicLibrary.shared.fileURL(t))
-        Equalizer.attach(to: item)
+        Equalizer.attach(to: item, gainDB: MusicLibrary.shared.normalizeGain(for: t))
         player.replaceCurrentItem(with: item)
         watch(item, t)
         if autoplay { player.play() }

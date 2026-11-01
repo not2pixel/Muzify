@@ -202,7 +202,7 @@ private struct AudioSettingsView: View {
                 Toggle(L("Tự cân âm lượng"), isOn: $audio.normalize)
                 Toggle(L("Bỏ qua đoạn không phải nhạc"), isOn: $audio.skipNonMusic)
             } footer: {
-                Text(L("Tự cân âm lượng giúp các bài to nhỏ đều nhau. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock."))
+                Text(L("Tự cân âm lượng dùng độ to chuẩn YouTube đo sẵn cho từng bài (như YouTube/Spotify), không làm méo tiếng. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock."))
                     .font(.caption).foregroundStyle(.secondary)
             }
 

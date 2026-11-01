@@ -102,8 +102,15 @@ private final class TapContext {
     var eqOn = false
     var preamp: Float = 1
     var scratch: [Float] = []
-    var level: Float = 0.1
-    var gain: Float = 1
+    /// Hệ số cân âm lượng cố định của bài (từ độ to chuẩn YouTube), 1 = giữ nguyên.
+    let trackGain: Float
+    /// Hệ số của limiter (1 = không giảm), chuyển mượt giữa các đoạn.
+    var limiter: Float = 1
+
+    init(gainDB: Double?) {
+        // Giảm thoải mái; tăng tối đa +6 dB (phần còn lại do limiter giữ không vỡ tiếng).
+        trackGain = gainDB.map { Float(pow(10, min($0, 6) / 20)) } ?? 1
+    }
 
     deinit { setups.forEach(vDSP_biquad_DestroySetup) }
 
@@ -137,7 +144,8 @@ private final class TapContext {
 
     func process(_ abl: UnsafeMutableAudioBufferListPointer, frames: Int) {
         let p = EQParams.shared.snapshot()
-        guard p.enabled || p.normalize, frames > 0 else { return }
+        // Tắt EQ và bài không cần cân → để nguyên âm thanh, không xử lý gì.
+        guard frames > 0, (p.enabled && p.gains.contains { $0 != 0 }) || (p.normalize && trackGain != 1) else { return }
         if p.version != version {
             version = p.version
             eqOn = p.enabled && p.gains.contains { $0 != 0 }
@@ -153,48 +161,55 @@ private final class TapContext {
             for c in 0..<n { chans.append((data + c, n)) }
         }
 
-        var sumSquares: Float = 0
-        for (i, (ptr, stride)) in chans.enumerated() {
+        let g: Float = p.normalize ? trackGain : 1
+        for (i, (ptr, stride)) in chans.enumerated() where eqOn && i < setups.count {
             scratch.withUnsafeMutableBufferPointer { s in
                 // Gom về mảng liền nhau → lọc → trả lại.
                 vDSP_mmov(ptr, s.baseAddress!, 1, vDSP_Length(frames), vDSP_Length(stride), 1)
-                if eqOn, i < setups.count {
-                    delays[i].withUnsafeMutableBufferPointer { d in
-                        vDSP_biquad(setups[i], d.baseAddress!, s.baseAddress!, 1, s.baseAddress!, 1, vDSP_Length(frames))
-                    }
-                    var pre = preamp
-                    vDSP_vsmul(s.baseAddress!, 1, &pre, s.baseAddress!, 1, vDSP_Length(frames))
+                delays[i].withUnsafeMutableBufferPointer { d in
+                    vDSP_biquad(setups[i], d.baseAddress!, s.baseAddress!, 1, s.baseAddress!, 1, vDSP_Length(frames))
                 }
-                var ss: Float = 0
-                vDSP_svesq(s.baseAddress!, 1, &ss, vDSP_Length(frames))
-                sumSquares += ss
+                var pre = preamp
+                vDSP_vsmul(s.baseAddress!, 1, &pre, s.baseAddress!, 1, vDSP_Length(frames))
                 vDSP_mmov(s.baseAddress!, ptr, 1, vDSP_Length(frames), 1, vDSP_Length(stride))
             }
         }
-
-        // Tự cân âm lượng: theo dõi độ to trung bình (chậm), kéo về khoảng -20 dBFS.
-        var g: Float = 1
-        if p.normalize, !chans.isEmpty {
-            let rms = sqrt(sumSquares / Float(frames * chans.count))
-            if rms > 0.0005 { level = level * 0.97 + rms * 0.03 }
-            let target = min(max(0.1 / max(level, 0.001), 0.5), 2.5)
-            gain += (target - gain) * 0.05
-            g = gain
+        if g != 1 {
+            for (ptr, stride) in chans {
+                var gg = g
+                vDSP_vsmul(ptr, stride, &gg, ptr, stride, vDSP_Length(frames))
+            }
         }
+        // Limiter mềm: đỉnh vượt -0,2 dBFS thì hạ nhanh, rồi nhả từ từ — thay cho cắt cứng (gây vỡ tiếng).
+        var peak: Float = 0
         for (ptr, stride) in chans {
-            var gg = g, lo: Float = -1, hi: Float = 1
-            if g != 1 { vDSP_vsmul(ptr, stride, &gg, ptr, stride, vDSP_Length(frames)) }
-            vDSP_vclip(ptr, stride, &lo, &hi, ptr, stride, vDSP_Length(frames))
+            var m: Float = 0
+            vDSP_maxmgv(ptr, stride, &m, vDSP_Length(frames))
+            peak = max(peak, m)
+        }
+        let ceiling: Float = 0.977
+        let target: Float = peak * limiter > ceiling ? ceiling / max(peak, 1e-6) : min(1, limiter + (1 - limiter) * 0.08)
+        let start = limiter
+        limiter = min(target, peak > 0 ? ceiling / peak : 1, 1)
+        if start != 1 || limiter != 1 {
+            for (ptr, stride) in chans {
+                var from = start
+                var step = (limiter - start) / Float(frames)
+                vDSP_vrampmul(ptr, stride, &from, &step, ptr, stride, vDSP_Length(frames))
+                var lo: Float = -1, hi: Float = 1
+                vDSP_vclip(ptr, stride, &lo, &hi, ptr, stride, vDSP_Length(frames)) // an toàn cuối cùng, hiếm khi chạm
+            }
         }
     }
 }
 
 enum Equalizer {
     /// Gắn bộ xử lý vào bài vừa nạp (bỏ qua nếu không đọc được rãnh âm thanh, vd luồng HLS).
-    static func attach(to item: AVPlayerItem) {
+    /// `gainDB`: mức cân âm lượng của bài (nil = không cân).
+    static func attach(to item: AVPlayerItem, gainDB: Double? = nil) {
         Task { @MainActor in
             guard let track = try? await item.asset.loadTracks(withMediaType: .audio).first else { return }
-            let ctx = Unmanaged.passRetained(TapContext()).toOpaque()
+            let ctx = Unmanaged.passRetained(TapContext(gainDB: gainDB)).toOpaque()
             var callbacks = MTAudioProcessingTapCallbacks(
                 version: kMTAudioProcessingTapCallbacksVersion_0, clientInfo: ctx,
                 init: { _, info, storage in storage.pointee = info },

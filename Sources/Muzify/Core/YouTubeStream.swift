@@ -19,6 +19,8 @@ actor YouTubeStream {
         var author: String?
         var duration: Double?
         var thumbnail: String?
+        /// Độ lệch so với độ to chuẩn của YouTube (−14 LUFS), dB — dùng để cân âm lượng giống YouTube/Spotify.
+        var gainDB: Double?
     }
 
     /// ID khách (lưu 6 giờ).
@@ -70,9 +72,14 @@ actor YouTubeStream {
             }
             let d = obj["videoDetails"] as? [String: Any]
             let thumbs = ((d?["thumbnail"] as? [String: Any])?["thumbnails"] as? [[String: Any]]) ?? []
+            // Độ to thật của bài (LUFS) và mức chuẩn YouTube nhắm tới.
+            let ac = (obj["playerConfig"] as? [String: Any])?["audioConfig"] as? [String: Any]
+            let loudness = (ac?["trackAbsoluteLoudnessLkfs"] as? Double) ?? (ac?["perceptualLoudnessDb"] as? Double)
+            let target = ac?["loudnessTargetLkfs"] as? Double ?? -14
             return Audio(url: url, headers: ["User-Agent": Self.userAgent],
                          title: d?["title"] as? String, author: d?["author"] as? String,
-                         duration: Double(d?["lengthSeconds"] as? String ?? ""), thumbnail: thumbs.last?["url"] as? String)
+                         duration: Double(d?["lengthSeconds"] as? String ?? ""), thumbnail: thumbs.last?["url"] as? String,
+                         gainDB: loudness.map { target - $0 })
         }
         throw MusicError.message(L("YouTube từ chối phát video này."))
     }

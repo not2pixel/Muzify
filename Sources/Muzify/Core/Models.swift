@@ -22,6 +22,8 @@ struct Track: Identifiable, Codable, Hashable {
     var catalog: String?
     /// Nằm trong "Bài hát đã thích".
     var liked = true
+    /// Mức cân âm lượng (dB) theo độ to chuẩn của YouTube — lưu cùng bản đã tải.
+    var gainDB: Double?
 
     /// Chưa tải về, phát trực tiếp từ mạng.
     var isRemote: Bool { file.isEmpty && remoteURL != nil }

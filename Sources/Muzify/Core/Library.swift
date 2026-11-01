@@ -322,6 +322,15 @@ final class MusicLibrary: ObservableObject {
     // MARK: Phát online
 
     /// Bỏ link đã lưu (link hết hạn / không phát được) để lần sau lấy lại.
+    /// Mức cân âm lượng (dB) của bài online, theo dữ liệu độ to YouTube gửi kèm link phát.
+    private var streamGain: [String: Double] = [:]
+
+    /// Mức cân âm lượng cho bài sắp phát: bản đã tải dùng giá trị đã lưu, bài online dùng giá trị lấy kèm link.
+    func normalizeGain(for t: Track) -> Double? {
+        if let i = libraryIndex(of: t), let g = tracks[i].gainDB { return g }
+        return t.remoteURL.flatMap { streamGain[$0] }
+    }
+
     func invalidateStream(_ t: Track) {
         if let r = t.remoteURL { resolved[r] = nil }
     }
@@ -356,6 +365,7 @@ final class MusicLibrary: ObservableObject {
             do {
                 let a = try await YouTubeStream.shared.audio(videoID: vid)
                 resolved[r] = (a.url, a.headers, .now)
+                if let g = a.gainDB { streamGain[r] = g }
                 return (a.url, a.headers)
             } catch {
                 Log.write("youtube native failed \(vid): \(error.localizedDescription)")
@@ -441,6 +451,7 @@ final class MusicLibrary: ObservableObject {
                     tracks[j].file = playable.lastPathComponent
                     tracks[j].artwork = art
                     if duration > 0 { tracks[j].duration = duration }
+                    if let r = cur.remoteURL, let g = streamGain[r] { tracks[j].gainDB = g }
                 } else {
                     try? FileManager.default.removeItem(at: playable) // bài đã bị bỏ thích trong lúc tải
                 }
@@ -563,7 +574,9 @@ final class MusicLibrary: ObservableObject {
                             "--progress-template", "download:MUZIFY %(progress._percent_str)s",
                             "-o", tracksDir.appendingPathComponent("\(stem).%(ext)s").path]
                 if let ffmpeg {
-                    args += ["-f", "bestaudio/best", "-x", "--audio-format", "m4a", "--ffmpeg-location", ffmpeg]
+                    // Ưu tiên bản AAC gốc (không mã hoá lại); chỉ chuyển đổi khi nguồn không có m4a.
+                    args += ["-f", "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio/best",
+                             "-x", "--audio-format", "m4a", "--ffmpeg-location", ffmpeg]
                 } else {
                     args += ["-f", "bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/bestaudio[ext=mp3]/best[ext=mp4]/best"]
                 }

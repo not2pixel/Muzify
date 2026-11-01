@@ -322,7 +322,8 @@ actor SoundCloudAPI {
                     return (f?["protocol"] as? String) == proto && ((f?["mime_type"] as? String) ?? "").hasPrefix(mime)
                 }?["url"] as? String
             }
-            guard let coding = pick("progressive", "audio/mpeg") ?? pick("hls", "audio/mpeg") ?? pick("hls", "audio/mp4")
+            // AAC 160 kbps (HLS) tốt hơn MP3 128 kbps.
+            guard let coding = pick("hls", "audio/mp4") ?? pick("progressive", "audio/mpeg") ?? pick("hls", "audio/mpeg")
             else { return nil }
             let auth = t["track_authorization"] as? String ?? ""
             let art = ((t["artwork_url"] as? String) ?? ((t["user"] as? [String: Any])?["avatar_url"] as? String))?

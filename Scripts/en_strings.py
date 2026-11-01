@@ -1,6 +1,7 @@
 # Bản dịch tiếng Anh: khoá = chuỗi gốc tiếng Việt. Sinh Resources/en.lproj/Localizable.strings:
 #   python3 Scripts/en_strings.py
 EN = {
+'Tự cân âm lượng dùng độ to chuẩn YouTube đo sẵn cho từng bài (như YouTube/Spotify), không làm méo tiếng. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock.': 'Normalize volume uses the loudness YouTube measures for each song (like YouTube and Spotify), without distorting the sound. Non-music sections (intros, talking in music videos…) come from the SponsorBlock community.',
 'Thay dữ liệu trên máy bằng dữ liệu YouTube…': 'Replace local data with YouTube data…',
 'Thay dữ liệu trên máy bằng dữ liệu YouTube?': 'Replace local data with YouTube data?',
 'Thay bằng dữ liệu YouTube': 'Replace with YouTube data',
@@ -66,7 +67,6 @@ EN = {
 'Áp dụng cho bài trên máy và bài YouTube Music; một số luồng SoundCloud không hỗ trợ.': 'Works for local and YouTube Music songs; some SoundCloud streams aren’t supported.',
 'Tự cân âm lượng': 'Normalize volume',
 'Bỏ qua đoạn không phải nhạc': 'Skip non-music sections',
-'Tự cân âm lượng giúp các bài to nhỏ đều nhau. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock.': 'Normalize volume keeps songs at a similar loudness. Non-music sections (intros, talking in music videos…) come from the SponsorBlock community.',
 'Hiện mini player trên thanh menu': 'Show mini player in the menu bar',
 'Phẳng': 'Flat',
 'Tăng bass': 'Bass boost',

@@ -271,7 +271,7 @@
 "Tệp trên máy" = "Local file";
 "Từ tài khoản YouTube của bạn" = "From your YouTube account";
 "Tự cân âm lượng" = "Normalize volume";
-"Tự cân âm lượng giúp các bài to nhỏ đều nhau. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock." = "Normalize volume keeps songs at a similar loudness. Non-music sections (intros, talking in music videos…) come from the SponsorBlock community.";
+"Tự cân âm lượng dùng độ to chuẩn YouTube đo sẵn cho từng bài (như YouTube/Spotify), không làm méo tiếng. Đoạn không phải nhạc (intro, đoạn nói trong MV…) lấy từ cộng đồng SponsorBlock." = "Normalize volume uses the loudness YouTube measures for each song (like YouTube and Spotify), without distorting the sound. Non-music sections (intros, talking in music videos…) come from the SponsorBlock community.";
 "Tự động phát" = "Autoplay";
 "Xem trước lời bài hát" = "Lyrics preview";
 "Xong" = "Done";
