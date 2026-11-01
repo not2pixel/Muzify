@@ -202,7 +202,7 @@ enum YTM {
 
 // MARK: - Nội dung mở được từ trang chủ / tìm kiếm
 
-enum HomeTarget: Hashable {
+enum HomeTarget: Hashable, Codable {
     case playlist(id: String, title: String)
     case mix(Track)
     case artist(String)
@@ -259,9 +259,9 @@ enum HomeTarget: Hashable {
 
 // MARK: - Mô hình trang chủ
 
-struct HomeItem: Identifiable {
-    enum Kind { case song(Track), open(HomeTarget) }
-    let id = UUID()
+struct HomeItem: Identifiable, Codable {
+    enum Kind: Codable { case song(Track), open(HomeTarget) }
+    var id = UUID()
     var title: String
     var subtitle: String
     var art: String?
@@ -270,9 +270,9 @@ struct HomeItem: Identifiable {
     var round = false
 }
 
-struct HomeShelf: Identifiable {
-    enum Style { case cards, songs }
-    let id = UUID()
+struct HomeShelf: Identifiable, Codable {
+    enum Style: Codable { case cards, songs }
+    var id = UUID()
     var title: String
     var subtitle: String?
     var style: Style = .cards
@@ -298,6 +298,32 @@ final class MusicHome: ObservableObject {
     /// Đã đăng nhập YouTube: bài đã thích + playlist của tài khoản.
     private var account: [HomeShelf] = []
 
+    // MARK: Lưu sẵn trang chủ (mở app là hiện ngay bản lần trước, rồi cập nhật ngầm từng mục)
+
+    private struct Cache: Codable {
+        var signedIn: Bool
+        var recommended, ytHome, account, ytCharts, charts, fresh: [HomeShelf]
+    }
+    private static var cacheURL: URL { MusicLibrary.shared.dir.appendingPathComponent("home.json") }
+
+    private init() {
+        if let data = try? Data(contentsOf: Self.cacheURL), let c = try? JSONDecoder().decode(Cache.self, from: data),
+           c.signedIn == YTAccount.isSignedIn {
+            recommended = c.recommended; ytHome = c.ytHome; account = c.account
+            ytCharts = c.ytCharts; charts = c.charts; fresh = c.fresh
+            publish()
+        }
+    }
+
+    private func saveCache() {
+        let c = Cache(signedIn: YTAccount.isSignedIn, recommended: recommended, ytHome: ytHome, account: account,
+                      ytCharts: ytCharts, charts: charts, fresh: fresh)
+        let url = Self.cacheURL
+        Task.detached(priority: .background) {
+            if let data = try? JSONEncoder().encode(c) { try? data.write(to: url, options: .atomic) }
+        }
+    }
+
     private func publish() {
         // Có tài khoản → mục của YouTube (Chọn nhanh, Nghe lại, mix dành riêng…) lên đầu như trên YouTube Music.
         shelves = YTAccount.isSignedIn
@@ -313,6 +339,7 @@ final class MusicHome: ObservableObject {
         if pending <= 0 {
             loading = false
             loadedAt = .now
+            saveCache()
             if shelves.isEmpty { error = L("Không tải được gợi ý. Kiểm tra kết nối mạng.") }
         }
     }
@@ -406,6 +433,7 @@ final class MusicHome: ObservableObject {
     func reset() {
         ytHome = []; recommended = []; account = []; ytCharts = []; fresh = []
         loadedAt = nil
+        try? FileManager.default.removeItem(at: Self.cacheURL)
         publish()
     }
 

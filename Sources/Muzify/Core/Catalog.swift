@@ -1,26 +1,103 @@
+import ImageIO
 import SwiftUI
 
-// MARK: - Ảnh bìa trên mạng (tải 1 lần, giữ trong bộ nhớ)
+// MARK: - Ảnh bìa trên mạng
+// Lưu ảnh xuống Caches/Muzify/Images (mở app lần sau hiện ngay), thu nhỏ trước khi hiển thị,
+// và gom nhiều ảnh vừa tải xong vào một lần cập nhật giao diện.
 
 @MainActor
 final class RemoteArt: ObservableObject {
     static let shared = RemoteArt()
     @Published private(set) var images: [String: PlatformImage] = [:]
     private var loading = Set<String>()
+    private var pending: [String: PlatformImage] = [:]
+    private var flushScheduled = false
+
+    nonisolated static let dir: URL = {
+        let d = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Muzify/Images", isDirectory: true)
+        try? FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+        return d
+    }()
+
+    private init() {
+        Task.detached(priority: .background) { Self.prune() }
+    }
 
     func image(_ url: String?) -> PlatformImage? {
         guard let url, !url.isEmpty else { return nil }
         if let img = images[url] { return img }
         guard !loading.contains(url), let u = URL(string: url) else { return nil }
         loading.insert(url)
-        Task {
-            if let (data, _) = try? await URLSession.shared.data(from: u), let img = PlatformImage(data: data) {
-                images[url] = img
+        Task.detached(priority: .userInitiated) {
+            let file = Self.file(for: url)
+            var data = try? Data(contentsOf: file)
+            if data == nil, let (d, resp) = try? await URLSession.shared.data(from: u),
+               ((resp as? HTTPURLResponse)?.statusCode ?? 200) < 400 {
+                data = d
+                try? d.write(to: file, options: .atomic)
             }
-            loading.remove(url)
+            let img = ImageBox(data.flatMap { Self.downsample($0, maxPixels: 1000) })
+            await MainActor.run { RemoteArt.shared.loaded(url, img.image) }
         }
         return nil
     }
+
+    private func loaded(_ url: String, _ img: PlatformImage?) {
+        loading.remove(url)
+        guard let img else { return }
+        pending[url] = img
+        guard !flushScheduled else { return }
+        flushScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            MainActor.assumeIsolated {
+                self.images.merge(self.pending) { _, new in new }
+                self.pending = [:]
+                self.flushScheduled = false
+            }
+        }
+    }
+
+    nonisolated private static func file(for url: String) -> URL {
+        let h = url.utf8.reduce(UInt64(0xcbf29ce484222325)) { ($0 ^ UInt64($1)) &* 0x100000001b3 }
+        return dir.appendingPathComponent(String(h, radix: 16) + ".img")
+    }
+
+    /// Giải mã ở kích thước vừa đủ (ảnh gốc YouTube có thể rất lớn).
+    nonisolated static func downsample(_ data: Data, maxPixels: Int) -> PlatformImage? {
+        let opts: [CFString: Any] = [kCGImageSourceCreateThumbnailFromImageAlways: true,
+                                     kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+                                     kCGImageSourceCreateThumbnailWithTransform: true]
+        guard let src = CGImageSourceCreateWithData(data as CFData, nil),
+              let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else { return PlatformImage(data: data) }
+        #if canImport(AppKit)
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+        #else
+        return UIImage(cgImage: cg)
+        #endif
+    }
+
+    /// Giữ bộ nhớ đệm ảnh dưới ~300 MB (xoá ảnh cũ nhất).
+    nonisolated private static func prune() {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.fileSizeKey, .contentAccessDateKey]) else { return }
+        let info = files.map { f -> (URL, Int, Date) in
+            let v = try? f.resourceValues(forKeys: [.fileSizeKey, .contentAccessDateKey])
+            return (f, v?.fileSize ?? 0, v?.contentAccessDate ?? .distantPast)
+        }
+        var total = info.reduce(0) { $0 + $1.1 }
+        guard total > 300_000_000 else { return }
+        for (f, size, _) in info.sorted(by: { $0.2 < $1.2 }) where total > 200_000_000 {
+            try? fm.removeItem(at: f)
+            total -= size
+        }
+    }
+}
+
+/// Ảnh đã giải mã xong, chỉ đọc → chuyển giữa các luồng an toàn.
+private struct ImageBox: @unchecked Sendable {
+    let image: PlatformImage?
+    init(_ i: PlatformImage?) { image = i }
 }
 
 // MARK: - Cài đặt kho nhạc
