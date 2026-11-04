@@ -324,11 +324,19 @@ final class MusicLibrary: ObservableObject {
     /// Bỏ link đã lưu (link hết hạn / không phát được) để lần sau lấy lại.
     /// Mức cân âm lượng (dB) của bài online, theo dữ liệu độ to YouTube gửi kèm link phát.
     private var streamGain: [String: Double] = [:]
+    /// Thời lượng thật của bài online do nguồn phát báo (AVPlayer báo gấp đôi với m4a DASH của YouTube).
+    private var streamLength: [String: Double] = [:]
 
     /// Mức cân âm lượng cho bài sắp phát: bản đã tải dùng giá trị đã lưu, bài online dùng giá trị lấy kèm link.
     func normalizeGain(for t: Track) -> Double? {
         if let i = libraryIndex(of: t), let g = tracks[i].gainDB { return g }
         return t.remoteURL.flatMap { streamGain[$0] }
+    }
+
+    /// Thời lượng đáng tin của bài online: của nguồn phát nếu đã có, không thì của danh sách. 0 = chưa biết.
+    func streamDuration(for t: Track) -> Double {
+        guard t.isRemote else { return 0 }
+        return t.remoteURL.flatMap { streamLength[$0] } ?? t.duration
     }
 
     func invalidateStream(_ t: Track) {
@@ -366,6 +374,7 @@ final class MusicLibrary: ObservableObject {
                 let a = try await YouTubeStream.shared.audio(videoID: vid)
                 resolved[r] = (a.url, a.headers, .now)
                 if let g = a.gainDB { streamGain[r] = g }
+                if let d = a.duration, d > 0 { streamLength[r] = d }
                 return (a.url, a.headers)
             } catch {
                 Log.write("youtube native failed \(vid): \(error.localizedDescription)")
@@ -393,11 +402,12 @@ final class MusicLibrary: ObservableObject {
         guard let tool = ytdlpPath() else { return nil }
         let fmt = "http_mp3_1_0/http_mp3_128/hls_mp3_1_0/hls_mp3_128/bestaudio[ext=mp3]/bestaudio[ext=m4a]/bestaudio[acodec^=mp4a]/best[ext=mp4]"
         let lines = await Self.outputLines(tool, ["--no-warnings", "--no-playlist", "-f", fmt,
-                                                   "--print", "%(url)s", "--print", "%(http_headers)j", page])
+                                                   "--print", "%(url)s", "--print", "%(http_headers)j", "--print", "%(duration)s", page])
         guard let first = lines.first, let url = URL(string: first) else { return nil }
         let headers = lines.count > 1
             ? ((try? JSONSerialization.jsonObject(with: Data(lines[1].utf8))) as? [String: String] ?? [:]) : [:]
         resolved[key] = (url, headers, .now)
+        if lines.count > 2, let d = Double(lines[2]), d > 0 { streamLength[key] = d }
         return (url, headers)
         #else
         return nil

@@ -94,9 +94,9 @@ final class MusicPlayer: ObservableObject {
                     NotificationCenter.default.post(name: .skippedNonMusic, object: nil)
                     return
                 }
-                let known = self.current?.duration ?? 0
+                let known = self.current.map { $0.isRemote ? MusicLibrary.shared.streamDuration(for: $0) : $0.duration } ?? 0
                 if let d = self.player.currentItem?.duration.seconds, d.isFinite, d > 0 {
-                    // Luồng m4a dạng DASH có thể báo gấp đôi — tin thời lượng từ kho nhạc nếu có.
+                    // Luồng m4a dạng DASH có thể báo gấp đôi — tin thời lượng của nguồn phát / kho nhạc nếu có.
                     self.duration = known > 0 && d > known * 1.3 ? known : d
                 }
                 if self.isPlaying, known > 0, self.current?.isRemote == true, self.time >= known - 0.3,
@@ -398,6 +398,8 @@ final class MusicPlayer: ObservableObject {
                     isPlaying = false
                     return
                 }
+                let length = MusicLibrary.shared.streamDuration(for: t)
+                if length > 0 { duration = length }
                 let asset = AVURLAsset(url: info.url, options: info.headers.isEmpty ? nil
                                        : ["AVURLAssetHTTPHeaderFieldsKey": info.headers])
                 let item = AVPlayerItem(asset: asset)
